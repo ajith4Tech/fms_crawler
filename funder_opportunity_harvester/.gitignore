@@ -1,0 +1,20 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.env
+venv/
+ENV/
+
+# Scrapy
+.scrapy/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Output files
+*.json
+*.csv
+*.xml
