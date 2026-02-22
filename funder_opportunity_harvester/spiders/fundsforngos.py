@@ -26,24 +26,23 @@ class FundsForNGOSSpider(scrapy.Spider):
         re.compile(r"(?:funded|launched|hosted) by ([A-Z][A-Za-z\s&]+)"),
     ]
 
-    # --- Improved Money Patterns ---
+    # --- Strict Currency Whitelist with Indian Scales ---
     MONEY_RE = re.compile(
-        r'(USD|US\$|\$|EUR|€|₹)\s?'
-        r'([\d,.]+)'
-        r'\s*(million|billion|thousand|m|bn)?',
+        r'\b(USD|EUR|JPY|UGX|CAD|SEK|PLN|DKK|AUD|GBP|CHF|ZAR|INR|NZD|SGD|HKD|CNY|KRW|THB|MYR|PHP|PKR|NGN|KES|RUB|BRL|MXN|US\$|\$|€|₹)\s?'
+        r'(\d{1,3}(?:,\d{3})*(?:\.\d+)?)'
+        r'\s*(million|billion|thousand|crore|lakh|m|bn)?',
         re.I
     )
 
     RANGE_RE = re.compile(
-        r'(USD|US\$|\$)\s?([\d,.]+)\s*(million|billion|m|bn)?'
+        r'\b(USD|EUR|JPY|UGX|CAD|SEK|PLN|DKK|AUD|GBP|CHF|ZAR|INR|NZD|SGD|HKD|CNY|KRW|THB|MYR|PHP|PKR|NGN|KES|RUB|BRL|MXN|US\$|\$|€|₹)\s?'
+        r'(\d{1,3}(?:,\d{3})*(?:\.\d+)?)\s*(million|billion|crore|lakh|m|bn)?'
         r'\s*(?:to|-|and)\s*'
-        r'(USD|US\$|\$)?\s?([\d,.]+)\s*(million|billion|m|bn)?',
+        r'(USD|EUR|JPY|UGX|CAD|SEK|PLN|DKK|AUD|GBP|CHF|ZAR|INR|NZD|SGD|HKD|CNY|KRW|THB|MYR|PHP|PKR|NGN|KES|RUB|BRL|MXN|US\$|\$|€|₹)?\s?'
+        r'(\d{1,3}(?:,\d{3})*(?:\.\d+)?)\s*(million|billion|crore|lakh|m|bn)?',
         re.I
     )
 
-    UPTO_RE = re.compile(r'up to\s*USD\s?([\d,]+)', re.I)
-    SINGLE_RE = re.compile(r'(?:total|indicative|overall).*?USD\s?([\d,]+)', re.I)
-    FALLBACK_RE = re.compile(r'(USD|EUR|₹|\$)\s?[\d,]+')
     DATE_RE = re.compile(r"(\d{1,2}-[A-Za-z]{3}-\d{4})")
 
     # ---------------- INIT ----------------
@@ -109,28 +108,77 @@ class FundsForNGOSSpider(scrapy.Spider):
         return "Not specified"
 
     def extract_funding_amount(self, text):
-        # ---- RANGE ----
+        # First check for ranges
         if m := self.RANGE_RE.search(text):
             start = f"{m.group(1)} {m.group(2)} {m.group(3) or ''}".strip()
-            end = f"{m.group(4) or m.group(1)} {m.group(5)} {m.group(6) or ''}".strip()
+            end_currency = m.group(4) if m.group(4) else m.group(1)
+            end = f"{end_currency} {m.group(5)} {m.group(6) or ''}".strip()
             return f"{start} – {end}"
 
-        # ---- SINGLE AMOUNT ----
-        matches = list(self.UPTO_RE.finditer(text))
+        # Find all money mentions
+        matches = list(self.MONEY_RE.finditer(text))
+
         if not matches:
-            matches = list(self.SINGLE_RE.finditer(text))
-        if not matches:
-            matches = list(self.FALLBACK_RE.finditer(text))
+            return None
 
-        if matches:
-            # Pick the largest realistic amount (usually the main grant)
-            best = matches[0]
-            if hasattr(best, 'group'):
-                amount = best.group(0)
-                return amount.strip()
+        def score(match):
+            value = float(match.group(2).replace(',', ''))
+            scale = (match.group(3) or '').lower()
 
-        return None
+            # Scale conversion with Indian units
+            if scale in ['billion', 'bn']:
+                value *= 1_000_000_000
+            elif scale in ['million', 'm']:
+                value *= 1_000_000
+            elif scale == 'thousand':
+                value *= 1_000
+            elif scale == 'crore':
+                value *= 10_000_000  # 1 crore = 10 million
+            elif scale == 'lakh':
+                value *= 100_000  # 1 lakh = 100 thousand
 
+            # Context window around match
+            start = max(match.start() - 80, 0)
+            end = min(match.end() + 80, len(text))
+            context = text[start:end].lower()
+
+            penalty = 0
+
+            # Penalize unwanted contexts
+            if any(word in context for word in [
+                "registered capital",
+                "capital ≤",
+                "intellectual property",
+                "requirements",
+                "eligible enterprises",
+            ]):
+                penalty -= value * 0.9  # heavy penalty
+
+            # Boost likely funding context
+            if any(word in context for word in [
+                "grant",
+                "funding",
+                "award",
+                "budget",
+                "prize",
+                "up to",
+                "ranging from",
+            ]):
+                penalty += value * 0.5
+
+            return value + penalty
+
+        best = max(matches, key=score)
+
+        # Only return if the best match has positive score (after penalties)
+        if score(best) <= 0:
+            return None
+
+        currency = best.group(1)
+        amount = best.group(2)
+        scale = best.group(3) or ""
+
+        return f"{currency} {amount} {scale}".strip()
 
     def extract_country(self, title, text):
         # 1️⃣ Exact country in title parentheses
@@ -154,8 +202,7 @@ class FundsForNGOSSpider(scrapy.Spider):
 
     # ---------------- PARSE ----------------
     def parse(self, response):
-        # Assuming this is the method with indentation issues
-        text = response.text  # Define text if it was undefined
+        text = response.text
         for post in response.css("article"):
             title = post.css("a.entry-title-link::text").get("")
             url = post.css("a.entry-title-link::attr(href)").get()
@@ -215,5 +262,5 @@ class FundsForNGOSSpider(scrapy.Spider):
             "Country": self.extract_country(title, clean_text),
             "Description": description,
             "Deadline": deadline,
-            "Source URL": response.url,
+            "Source URL": response.url if response.url.startswith("http") else None,
         }
