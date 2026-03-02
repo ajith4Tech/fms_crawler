@@ -15,7 +15,8 @@ fms_crawler/
     ├── pipelines.py         # FrappePipeline – sends scraped data to Frappe
     ├── middlewares.py       # Spider & downloader middlewares
     └── spiders/
-        └── fundsforngos.py  # Spider for fundsforngos.org
+        ├── fundsforngos.py  # Spider for fundsforngos.org
+        └── UngmSpider.py    # Spider for ungm.org (UN procurement notices)
 ```
 
 ---
@@ -43,6 +44,30 @@ Crawls the FundsForNGOs website and extracts active grant opportunities.
 - Auto-throttle enabled (1–3 s delay) to crawl politely.
 - Skips opportunities with no funding amount or a past deadline.
 - Regex-based extraction for organisations, currencies, and dates.
+
+---
+
+### `ungm` — [ungm.org](https://www.ungm.org/Public/Notice)
+
+Crawls the UN Global Marketplace and extracts active procurement notices via its internal JSON search API.
+
+**Extracted fields:**
+
+| Field | Description |
+|---|---|
+| `notice_id` | Unique UNGM notice ID |
+| `title` | Notice title |
+| `deadline` | Application deadline |
+| `agency` | Issuing UN agency |
+| `reference` | Notice reference number |
+| `country` | Country of interest |
+| `detail_url` | Full URL to the notice detail page |
+
+**Features:**
+- Uses a **POST**-based JSON search API (`/Public/Notice/Search`) instead of HTML pagination.
+- Automatically paginates through all results (15 per page) until no more rows are returned.
+- Filters to active notices (`IsActive: true`) with a future deadline.
+- Sorted by deadline ascending so the soonest-closing opportunities appear first.
 
 ---
 
@@ -101,18 +126,21 @@ Run a specific spider:
 
 ```bash
 scrapy crawl fundsforngos
+scrapy crawl ungm
 ```
 
 Export to a JSON file instead of the Frappe pipeline:
 
 ```bash
 scrapy crawl fundsforngos -o opportunities.json
+scrapy crawl ungm -o ungm_notices.json
 ```
 
 Override the Frappe endpoint at runtime:
 
 ```bash
 FRAPPE_ENDPOINT=https://your-frappe-site/api/method/scrapy.api.upsert scrapy crawl fundsforngos
+FRAPPE_ENDPOINT=https://your-frappe-site/api/method/scrapy.api.upsert scrapy crawl ungm
 ```
 
 ---
