@@ -122,6 +122,12 @@ Key settings in `funder_opportunity_harvester/settings.py`:
 
 ## Usage
 
+Run all spiders concurrently:
+
+```bash
+python3 funder_opportunity_harvester/run_spiders.py
+```
+
 Run a specific spider:
 
 ```bash
