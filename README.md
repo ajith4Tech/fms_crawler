@@ -71,6 +71,32 @@ Crawls the UN Global Marketplace and extracts active procurement notices via its
 
 ---
 
+### `ngobox` — [ngobox.org](https://ngobox.org/grant_announcement_listing.php)
+
+Crawls ngobox.org for active grant and funding announcements. 
+
+**Extracted fields:**
+
+| Field | Description |
+|---|---|
+| `Title` | Grant title |
+| `Organization` | Funding organisation |
+| `Funding Amount` | Grant amount or range |
+| `Thematic Area` | Theme (extracted from 'Focus areas' block) |
+| `Country` | Target country or location |
+| `Description` | Combined text blocks describing the opportunity |
+| `Deadline` | Application deadline (normalized to YYYY-MM-DD) |
+| `Source URL` | Link to the original post |
+
+**Features:**
+- Paginates via standard link following.
+- Fetches detailed content via a separate detail page request.
+- Uses regex to meticulously extract thematic areas from 'Focus areas/Eligibility' text blocks.
+- Uses regex to strictly match country or location.
+- Automatically normalizes the deadline to standard ISO date format (`YYYY-MM-DD`).
+
+---
+
 ## Pipeline — `FrappePipeline`
 
 After scraping, every item is **POST**ed to a Frappe endpoint:
@@ -133,6 +159,7 @@ Run a specific spider:
 ```bash
 scrapy crawl fundsforngos
 scrapy crawl ungm
+scrapy crawl ngobox
 ```
 
 Export to a JSON file instead of the Frappe pipeline:
@@ -140,6 +167,7 @@ Export to a JSON file instead of the Frappe pipeline:
 ```bash
 scrapy crawl fundsforngos -o opportunities.json
 scrapy crawl ungm -o ungm_notices.json
+scrapy crawl ngobox -o ngobox.json
 ```
 
 Override the Frappe endpoint at runtime:
@@ -147,6 +175,7 @@ Override the Frappe endpoint at runtime:
 ```bash
 FRAPPE_ENDPOINT=https://your-frappe-site/api/method/scrapy.api.upsert scrapy crawl fundsforngos
 FRAPPE_ENDPOINT=https://your-frappe-site/api/method/scrapy.api.upsert scrapy crawl ungm
+FRAPPE_ENDPOINT=https://your-frappe-site/api/method/scrapy.api.upsert scrapy crawl ngobox
 ```
 
 ---

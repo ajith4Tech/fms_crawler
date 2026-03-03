@@ -9,10 +9,12 @@ from scrapy.utils.project import get_project_settings
 
 from funder_opportunity_harvester.spiders.fundsforngos import FundsForNGOSSpider
 from funder_opportunity_harvester.spiders.UngmSpider import UngmSpider
+from funder_opportunity_harvester.spiders.ngobox import NgoBoxSpider
 
 process = CrawlerProcess(get_project_settings())
 
 process.crawl(FundsForNGOSSpider)
 process.crawl(UngmSpider)
+process.crawl(NgoBoxSpider)
 
 process.start()
