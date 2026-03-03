@@ -65,6 +65,10 @@ DEFAULT_REQUEST_HEADERS = {
 #    "funder_opportunity_harvester.pipelines.FunderOpportunityHarvesterPipeline": 300,
 #}
 
+ITEM_PIPELINES = {
+    'funder_opportunity_harvester.pipelines.FrappePipeline': 300,
+}
+
 # Enable and configure the AutoThrottle extension (disabled by default)
 # See https://docs.scrapy.org/en/latest/topics/autothrottle.html
 #AUTOTHROTTLE_ENABLED = True
